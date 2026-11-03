@@ -1,0 +1,19 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+*.exe
+*.dll
+*.pdb
+
+# Visual Studio / VS Code / IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,61 @@
+{
+  "SchemaVersion": 1,
+  "Name": "Kịch bản mẫu (Click + Kéo thả)",
+  "LoopCount": 1,
+  "SpeedMultiplier": 1.0,
+  "RandomJitterMs": 10,
+  "ScreenTopology": {
+    "VirtualLeft": 0,
+    "VirtualTop": 0,
+    "VirtualWidth": 1920,
+    "VirtualHeight": 1080,
+    "MonitorCount": 1
+  },
+  "Steps": [
+    {
+      "StepId": 1,
+      "ActionType": "LeftClick",
+      "X": 640,
+      "Y": 480,
+      "MouseData": 0,
+      "VirtualKeyCode": 0,
+      "DelayBeforeMs": 300,
+      "HoldDurationMs": 35,
+      "PairStepId": null
+    },
+    {
+      "StepId": 2,
+      "ActionType": "LeftDown",
+      "X": 700,
+      "Y": 500,
+      "MouseData": 0,
+      "VirtualKeyCode": 0,
+      "DelayBeforeMs": 250,
+      "HoldDurationMs": 0,
+      "PairStepId": 4
+    },
+    {
+      "StepId": 3,
+      "ActionType": "MouseMove",
+      "X": 850,
+      "Y": 500,
+      "MouseData": 0,
+      "VirtualKeyCode": 0,
+      "DelayBeforeMs": 100,
+      "HoldDurationMs": 0,
+      "PairStepId": null
+    },
+    {
+      "StepId": 4,
+      "ActionType": "LeftUp",
+      "X": 850,
+      "Y": 500,
+      "MouseData": 0,
+      "VirtualKeyCode": 0,
+      "DelayBeforeMs": 80,
+      "HoldDurationMs": 0,
+      "PairStepId": 2
+    }
+  ]
+}
+
