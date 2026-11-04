@@ -15,7 +15,7 @@ namespace SwiftMacroPro
         private const int HOTKEY_ID_RECORD = 1001;
         private const int HOTKEY_ID_PLAY = 1002;
         private const int HOTKEY_ID_STOP = 1003;
-        private const int HOTKEY_ID_CAPTURE_BROWSER_ORIGIN = 1004;
+        private const int HOTKEY_ID_CAPTURE_STEP = 1004;
 
         private readonly MacroRecorder _recorder = new MacroRecorder();
         private readonly MacroPlayer _player = new MacroPlayer();
@@ -341,7 +341,7 @@ namespace SwiftMacroPro
                 CreateInlineLabel("URL:"), _txtBrowserUrl,
                 CreateInlineLabel("Gốc web X/Y:"), _numBrowserOriginX, _numBrowserOriginY,
                 CreateInlineLabel("Khung W/H:"), _numBrowserWidth, _numBrowserHeight,
-                btnBrowserLogin, CreateInlineLabel("Lấy gốc: Alt+F7")
+                btnBrowserLogin
             });
             grpSettings.Controls.Add(browserRow);
 
@@ -350,7 +350,7 @@ namespace SwiftMacroPro
             // =========================================================================
             GroupBox grpEditor = new GroupBox
             {
-                Text = "Thêm Bước Nhanh, Chỉnh Delay Hàng Loạt && Lưu trữ Kịch bản (.json)",
+                Text = "Thêm Bước Nhanh (Alt+F7: lấy tọa độ chuột), Chỉnh Delay Hàng Loạt && Lưu trữ Kịch bản (.json)",
                 Dock = DockStyle.Bottom,
                 Height = 66,
                 Padding = new Padding(10, 4, 10, 4)
@@ -845,11 +845,11 @@ namespace SwiftMacroPro
                 failed.Add(string.Format("Dừng ({0}+{1}, mã lỗi {2})", _cboModStop.Text, _cboKeyStop.Text, err));
             }
 
-            if (!NativeMethods.RegisterHotKey(Handle, HOTKEY_ID_CAPTURE_BROWSER_ORIGIN,
+            if (!NativeMethods.RegisterHotKey(Handle, HOTKEY_ID_CAPTURE_STEP,
                 NativeMethods.MOD_ALT | NativeMethods.MOD_NOREPEAT, (uint)Keys.F7))
             {
                 int err = Marshal.GetLastWin32Error();
-                failed.Add(string.Format("Lấy gốc web (Alt+F7, mã lỗi {0})", err));
+                failed.Add(string.Format("Thêm bước tại vị trí chuột (Alt+F7, mã lỗi {0})", err));
             }
 
             if (failed.Count == 0)
@@ -877,7 +877,7 @@ namespace SwiftMacroPro
             NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID_RECORD);
             NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID_PLAY);
             NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID_STOP);
-            NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID_CAPTURE_BROWSER_ORIGIN);
+            NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID_CAPTURE_STEP);
         }
 
         private static uint ParseModifier(string text)
@@ -910,22 +910,28 @@ namespace SwiftMacroPro
                 {
                     StopAllActiveOperations();
                 }
-                else if (id == HOTKEY_ID_CAPTURE_BROWSER_ORIGIN)
+                else if (id == HOTKEY_ID_CAPTURE_STEP)
                 {
-                    CaptureBrowserOrigin();
+                    CaptureStepAtCursor();
                 }
             }
             base.WndProc(ref m);
         }
 
-        private void CaptureBrowserOrigin()
+        private void CaptureStepAtCursor()
         {
+            if (_recorder.IsRecording || _player.IsPlaying)
+            {
+                _lblStatusBadge.Text = "Dừng ghi/phát trước khi thêm bước bằng Alt+F7.";
+                _lblStatusBadge.ForeColor = Color.DarkOrange;
+                return;
+            }
             Point position = Cursor.Position;
-            _numBrowserOriginX.Value = Math.Max(_numBrowserOriginX.Minimum, Math.Min(_numBrowserOriginX.Maximum, position.X));
-            _numBrowserOriginY.Value = Math.Max(_numBrowserOriginY.Minimum, Math.Min(_numBrowserOriginY.Maximum, position.Y));
-            _currentProfile.BrowserOriginX = (int)_numBrowserOriginX.Value;
-            _currentProfile.BrowserOriginY = (int)_numBrowserOriginY.Value;
-            _lblStatusBadge.Text = string.Format("ĐÃ LẤY GỐC WEB: X={0}, Y={1}", position.X, position.Y);
+            _numQuickX.Value = Math.Max(_numQuickX.Minimum, Math.Min(_numQuickX.Maximum, position.X));
+            _numQuickY.Value = Math.Max(_numQuickY.Minimum, Math.Min(_numQuickY.Maximum, position.Y));
+            MacroStep step = AddQuickStepAt(position.X, position.Y);
+            _lblStatusBadge.Text = string.Format("ĐÃ THÊM BƯỚC #{0}: {1} tại X={2}, Y={3}",
+                step.StepId, step.ActionType, position.X, position.Y);
             _lblStatusBadge.ForeColor = Color.FromArgb(13, 110, 253);
         }
 
@@ -1126,17 +1132,26 @@ namespace SwiftMacroPro
 
         private void AddQuickStep()
         {
+            AddQuickStepAt((int)_numQuickX.Value, (int)_numQuickY.Value);
+        }
+
+        private MacroStep AddQuickStepAt(int x, int y)
+        {
             if (_gridSteps.IsCurrentCellInEditMode) _gridSteps.EndEdit();
 
             MacroActionType selectedType;
             Enum.TryParse(_cboQuickAction.Text, true, out selectedType);
 
+            int nextStepId = 1;
+            foreach (MacroStep step in _currentProfile.Steps)
+                nextStepId = Math.Max(nextStepId, step.StepId + 1);
+
             MacroStep newStep = new MacroStep
             {
-                StepId = _currentProfile.Steps.Count + 1,
+                StepId = nextStepId,
                 ActionType = selectedType.ToString(),
-                X = (int)_numQuickX.Value,
-                Y = (int)_numQuickY.Value,
+                X = x,
+                Y = y,
                 DelayBeforeMs = (int)_numQuickDelay.Value,
                 HoldDurationMs = 35
             };
@@ -1159,7 +1174,7 @@ namespace SwiftMacroPro
                     {
                         MacroStep upStep = new MacroStep
                         {
-                            StepId = _currentProfile.Steps.Count + 1,
+                            StepId = nextStepId + 1,
                             ActionType = counterpart.Value.ToString(),
                             X = newStep.X,
                             Y = newStep.Y,
@@ -1175,6 +1190,7 @@ namespace SwiftMacroPro
 
             MacroValidator.ValidateAndBindPairs(_currentProfile);
             _stepsBinding.ResetBindings();
+            return newStep;
         }
 
         private void ApplyBatchDelayToAllSteps()
