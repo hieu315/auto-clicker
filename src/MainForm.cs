@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -39,6 +40,9 @@ namespace SwiftMacroPro
         private NumericUpDown _numLoopCount;
         private NumericUpDown _numSpeed;
         private NumericUpDown _numJitter;
+        private TextBox _txtBrowserUrl;
+        private NumericUpDown _numBrowserOriginX, _numBrowserOriginY;
+        private NumericUpDown _numBrowserWidth, _numBrowserHeight;
 
         // Cấu hình Phím tắt
         private ComboBox _cboModRecord, _cboKeyRecord;
@@ -187,7 +191,7 @@ namespace SwiftMacroPro
             {
                 Text = "Cấu hình Chế độ Phát (Web / Không chiếm chuột), Vòng lặp && Phím tắt Toàn cục",
                 Dock = DockStyle.Top,
-                Height = 96,
+                Height = 132,
                 Padding = new Padding(10, 4, 10, 4)
             };
 
@@ -212,6 +216,7 @@ namespace SwiftMacroPro
             _cboPlaybackMode.Items.Add("1. SendInput (Mặc định - Chuẩn OS)");
             _cboPlaybackMode.Items.Add("2. Snap & Restore (Mượn & Trả chuột nhanh - Tối ưu Web)");
             _cboPlaybackMode.Items.Add("3. PostMessage (Chạy ngầm Cửa sổ HWND)");
+            _cboPlaybackMode.Items.Add("4. Chrome ẩn (không dùng chuột Windows)");
             _cboPlaybackMode.SelectedIndex = 1;
 
             _chkRecordMove = new CheckBox { Text = "Ghi đường di chuột", AutoSize = true, UseMnemonic = false, Margin = new Padding(0, 6, 16, 2) };
@@ -312,6 +317,32 @@ namespace SwiftMacroPro
 
             grpSettings.Controls.Add(flpSettingsRow2);
             grpSettings.Controls.Add(flpSettingsRow1);
+
+            FlowLayoutPanel browserRow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 31,
+                WrapContents = false
+            };
+            _txtBrowserUrl = new TextBox { Width = 310, Margin = new Padding(0, 4, 8, 0) };
+            _numBrowserOriginX = CreateBrowserNumber(-32768, 32767, 0, 68);
+            _numBrowserOriginY = CreateBrowserNumber(-32768, 32767, 0, 68);
+            _numBrowserWidth = CreateBrowserNumber(1, 10000, 1280, 70);
+            _numBrowserHeight = CreateBrowserNumber(1, 10000, 720, 70);
+            ToolTip browserTip = new ToolTip();
+            browserTip.SetToolTip(_numBrowserOriginX, "Tọa độ X mép trái nội dung trang web lúc ghi macro.");
+            browserTip.SetToolTip(_numBrowserOriginY, "Tọa độ Y mép trên nội dung trang web lúc ghi macro.");
+            browserTip.SetToolTip(_numBrowserWidth, "Chiều rộng vùng nội dung trình duyệt khi chạy ẩn.");
+            browserTip.SetToolTip(_numBrowserHeight, "Chiều cao vùng nội dung trình duyệt khi chạy ẩn.");
+            Button btnBrowserLogin = new Button { Text = "Mở Chrome để đăng nhập", AutoSize = true, Margin = new Padding(8, 2, 0, 0) };
+            btnBrowserLogin.Click += (s, e) => OpenBrowserForLogin();
+            browserRow.Controls.AddRange(new Control[] {
+                CreateInlineLabel("URL:"), _txtBrowserUrl,
+                CreateInlineLabel("Gốc web X/Y:"), _numBrowserOriginX, _numBrowserOriginY,
+                CreateInlineLabel("Khung W/H:"), _numBrowserWidth, _numBrowserHeight,
+                btnBrowserLogin
+            });
+            grpSettings.Controls.Add(browserRow);
 
             // =========================================================================
             // 3. Thanh công cụ phía dưới (Gọn 1 dòng duy nhất - Height = 64)
@@ -955,6 +986,16 @@ namespace SwiftMacroPro
             }
 
             SyncUiSettingsToProfile();
+            if (_currentProfile.ParsedPlaybackMode == PlaybackMode.HeadlessChrome)
+            {
+                Uri browserUri;
+                if (!Uri.TryCreate(_currentProfile.BrowserUrl, UriKind.Absolute, out browserUri) ||
+                    (browserUri.Scheme != Uri.UriSchemeHttp && browserUri.Scheme != Uri.UriSchemeHttps))
+                {
+                    MessageBox.Show("Nhập URL http/https cho chế độ Chrome ẩn.", "Thiếu URL", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
 
             if (_currentProfile.Steps.Count == 0)
             {
@@ -975,7 +1016,8 @@ namespace SwiftMacroPro
             }
 
             ScreenTopology currentScreen = ScreenTopology.CaptureCurrent();
-            if (_currentProfile.ScreenTopology != null && !currentScreen.Matches(_currentProfile.ScreenTopology))
+            if (_currentProfile.ParsedPlaybackMode != PlaybackMode.HeadlessChrome &&
+                _currentProfile.ScreenTopology != null && !currentScreen.Matches(_currentProfile.ScreenTopology))
             {
                 DialogResult dr = MessageBox.Show(
                     string.Format("Cấu hình màn hình hiện tại khác với lúc ghi kịch bản!\n\n- Lúc ghi: {0}\n- Hiện tại: {1}\n\nBạn vẫn muốn tiếp tục phát lại?",
@@ -1213,11 +1255,18 @@ namespace SwiftMacroPro
             _currentProfile.LoopCount = (int)_numLoopCount.Value;
             _currentProfile.SpeedMultiplier = (double)_numSpeed.Value;
             _currentProfile.RandomJitterMs = (int)_numJitter.Value;
+            _currentProfile.BrowserUrl = _txtBrowserUrl.Text.Trim();
+            _currentProfile.BrowserOriginX = (int)_numBrowserOriginX.Value;
+            _currentProfile.BrowserOriginY = (int)_numBrowserOriginY.Value;
+            _currentProfile.BrowserViewportWidth = (int)_numBrowserWidth.Value;
+            _currentProfile.BrowserViewportHeight = (int)_numBrowserHeight.Value;
 
             if (_cboPlaybackMode.SelectedIndex == 1)
                 _currentProfile.ParsedPlaybackMode = PlaybackMode.SnapAndRestore;
             else if (_cboPlaybackMode.SelectedIndex == 2)
                 _currentProfile.ParsedPlaybackMode = PlaybackMode.BackgroundPostMessage;
+            else if (_cboPlaybackMode.SelectedIndex == 3)
+                _currentProfile.ParsedPlaybackMode = PlaybackMode.HeadlessChrome;
             else
                 _currentProfile.ParsedPlaybackMode = PlaybackMode.SendInput;
 
@@ -1282,11 +1331,17 @@ namespace SwiftMacroPro
                         _numLoopCount.Value = Math.Max(_numLoopCount.Minimum, Math.Min(_numLoopCount.Maximum, loaded.LoopCount));
                         _numSpeed.Value = Math.Max(_numSpeed.Minimum, Math.Min(_numSpeed.Maximum, (decimal)loaded.SpeedMultiplier));
                         _numJitter.Value = Math.Max(_numJitter.Minimum, Math.Min(_numJitter.Maximum, loaded.RandomJitterMs));
+                        _txtBrowserUrl.Text = loaded.BrowserUrl ?? "";
+                        _numBrowserOriginX.Value = Math.Max(_numBrowserOriginX.Minimum, Math.Min(_numBrowserOriginX.Maximum, loaded.BrowserOriginX));
+                        _numBrowserOriginY.Value = Math.Max(_numBrowserOriginY.Minimum, Math.Min(_numBrowserOriginY.Maximum, loaded.BrowserOriginY));
+                        _numBrowserWidth.Value = loaded.BrowserViewportWidth > 0 ? Math.Min(_numBrowserWidth.Maximum, loaded.BrowserViewportWidth) : 1280;
+                        _numBrowserHeight.Value = loaded.BrowserViewportHeight > 0 ? Math.Min(_numBrowserHeight.Maximum, loaded.BrowserViewportHeight) : 720;
 
                         switch (loaded.ParsedPlaybackMode)
                         {
                             case PlaybackMode.SnapAndRestore: _cboPlaybackMode.SelectedIndex = 1; break;
                             case PlaybackMode.BackgroundPostMessage: _cboPlaybackMode.SelectedIndex = 2; break;
+                            case PlaybackMode.HeadlessChrome: _cboPlaybackMode.SelectedIndex = 3; break;
                             default: _cboPlaybackMode.SelectedIndex = 0; break;
                         }
 
@@ -1309,6 +1364,44 @@ namespace SwiftMacroPro
                         MessageBox.Show("Không thể đọc file JSON: " + ex.Message, "Lỗi đọc file", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
+            }
+        }
+
+        private static NumericUpDown CreateBrowserNumber(int min, int max, int value, int width)
+        {
+            return new NumericUpDown
+            {
+                Minimum = min, Maximum = max, Value = value, Width = width,
+                Margin = new Padding(0, 4, 5, 0)
+            };
+        }
+
+        private void OpenBrowserForLogin()
+        {
+            Uri uri;
+            if (!Uri.TryCreate(_txtBrowserUrl.Text.Trim(), UriKind.Absolute, out uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                MessageBox.Show("Nhập URL http/https trước khi mở Chrome.", "Thiếu URL");
+                return;
+            }
+            try
+            {
+                string chrome = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
+                if (!File.Exists(chrome)) throw new FileNotFoundException("Không tìm thấy Chrome", chrome);
+                string profile = HeadlessBrowserRunner.ProfileDirectory;
+                Directory.CreateDirectory(profile);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = chrome,
+                    Arguments = "--user-data-dir=\"" + profile + "\" --no-first-run \"" + uri.AbsoluteUri + "\"",
+                    UseShellExecute = false
+                });
+                MessageBox.Show("Đăng nhập trong Chrome vừa mở, sau đó đóng toàn bộ cửa sổ Chrome này trước khi chạy ẩn.", "Chuẩn bị phiên web");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Không mở được Chrome: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

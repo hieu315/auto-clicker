@@ -23,6 +23,7 @@ echo Dang bien dich SwiftMacroPro.exe (.NET Framework 4.8 + PerMonitorV2 Manifes
     src\NativeMethods.cs ^
     src\Models.cs ^
     src\MacroEngine.cs ^
+    src\HeadlessBrowserRunner.cs ^
     src\MainForm.cs
 
 if %ERRORLEVEL% neq 0 (

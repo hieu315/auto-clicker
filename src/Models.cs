@@ -33,7 +33,8 @@ namespace SwiftMacroPro
     {
         SendInput,
         SnapAndRestore,
-        BackgroundPostMessage
+        BackgroundPostMessage,
+        HeadlessChrome
     }
 
     public class ScreenTopology
@@ -201,6 +202,11 @@ namespace SwiftMacroPro
         public double SpeedMultiplier { get; set; }
         public int RandomJitterMs { get; set; }
         public string PlaybackModeName { get; set; }
+        public string BrowserUrl { get; set; }
+        public int BrowserOriginX { get; set; }
+        public int BrowserOriginY { get; set; }
+        public int BrowserViewportWidth { get; set; }
+        public int BrowserViewportHeight { get; set; }
         public ScreenTopology ScreenTopology { get; set; }
         public List<MacroStep> Steps { get; set; }
 
@@ -212,6 +218,9 @@ namespace SwiftMacroPro
             SpeedMultiplier = 1.0;
             RandomJitterMs = 0;
             PlaybackModeName = PlaybackMode.SendInput.ToString();
+            BrowserUrl = "";
+            BrowserViewportWidth = 1280;
+            BrowserViewportHeight = 720;
             ScreenTopology = ScreenTopology.CaptureCurrent();
             Steps = new List<MacroStep>();
         }

@@ -481,7 +481,7 @@ namespace SwiftMacroPro
             CancellationToken token = _cts.Token;
             _isPlaying = true;
 
-            _workerThread = new Thread(() => RunPlaybackLoop(stepsCopy, loopCount, speedMultiplier, randomJitterMs, mode, token))
+            _workerThread = new Thread(() => RunPlaybackLoop(stepsCopy, loopCount, speedMultiplier, randomJitterMs, mode, profile, token))
             {
                 IsBackground = true,
                 Name = "MacroPlayerWorker"
@@ -512,7 +512,7 @@ namespace SwiftMacroPro
             return Math.Max(0, result);
         }
 
-        private void RunPlaybackLoop(List<MacroStep> steps, int loopCount, double speedMultiplier, int randomJitterMs, PlaybackMode mode, CancellationToken token)
+        private void RunPlaybackLoop(List<MacroStep> steps, int loopCount, double speedMultiplier, int randomJitterMs, PlaybackMode mode, MacroProfile profile, CancellationToken token)
         {
             bool cancelled = false;
             string finishMessage = "Hoàn thành kịch bản.";
@@ -527,6 +527,13 @@ namespace SwiftMacroPro
 
             try
             {
+                if (mode == PlaybackMode.HeadlessChrome)
+                {
+                    string browserResult = HeadlessBrowserRunner.Run(profile, steps, loopCount, speedMultiplier, randomJitterMs, token);
+                    cancelled = token.IsCancellationRequested;
+                    finishMessage = browserResult;
+                    return;
+                }
                 int currentLoop = 0;
                 while (!token.IsCancellationRequested)
                 {
