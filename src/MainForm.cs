@@ -15,6 +15,7 @@ namespace SwiftMacroPro
         private const int HOTKEY_ID_RECORD = 1001;
         private const int HOTKEY_ID_PLAY = 1002;
         private const int HOTKEY_ID_STOP = 1003;
+        private const int HOTKEY_ID_CAPTURE_BROWSER_ORIGIN = 1004;
 
         private readonly MacroRecorder _recorder = new MacroRecorder();
         private readonly MacroPlayer _player = new MacroPlayer();
@@ -340,7 +341,7 @@ namespace SwiftMacroPro
                 CreateInlineLabel("URL:"), _txtBrowserUrl,
                 CreateInlineLabel("Gốc web X/Y:"), _numBrowserOriginX, _numBrowserOriginY,
                 CreateInlineLabel("Khung W/H:"), _numBrowserWidth, _numBrowserHeight,
-                btnBrowserLogin
+                btnBrowserLogin, CreateInlineLabel("Lấy gốc: Alt+F7")
             });
             grpSettings.Controls.Add(browserRow);
 
@@ -822,7 +823,7 @@ namespace SwiftMacroPro
             Enum.TryParse(_cboKeyPlay.Text, true, out vkPlay);
             Enum.TryParse(_cboKeyStop.Text, true, out vkStop);
 
-            _recorder.SetIgnoredHotkeyVkCodes(new int[] { (int)vkRec, (int)vkPlay, (int)vkStop });
+            _recorder.SetIgnoredHotkeyVkCodes(new int[] { (int)vkRec, (int)vkPlay, (int)vkStop, (int)Keys.F7 });
 
             List<string> failed = new List<string>();
 
@@ -844,6 +845,13 @@ namespace SwiftMacroPro
                 failed.Add(string.Format("Dừng ({0}+{1}, mã lỗi {2})", _cboModStop.Text, _cboKeyStop.Text, err));
             }
 
+            if (!NativeMethods.RegisterHotKey(Handle, HOTKEY_ID_CAPTURE_BROWSER_ORIGIN,
+                NativeMethods.MOD_ALT | NativeMethods.MOD_NOREPEAT, (uint)Keys.F7))
+            {
+                int err = Marshal.GetLastWin32Error();
+                failed.Add(string.Format("Lấy gốc web (Alt+F7, mã lỗi {0})", err));
+            }
+
             if (failed.Count == 0)
             {
                 _lblHotkeyStatus.Text = "✓ Hotkey OK";
@@ -856,7 +864,7 @@ namespace SwiftMacroPro
                 MessageBox.Show(
                     "Không thể đăng ký tổ hợp phím tắt sau (có thể đã bị ứng dụng khác hoặc hệ điều hành chiếm dụng):\n\n- "
                     + string.Join("\n- ", failed.ToArray())
-                    + "\n\nVui lòng chọn tổ hợp phím khác rồi bấm 'Áp dụng Hotkey'.",
+                    + "\n\nVới phím Ghi/Phát/Dừng, hãy chọn tổ hợp khác rồi bấm 'Áp dụng Hotkey'. Nếu Alt+F7 bị trùng, hãy đóng ứng dụng đang dùng tổ hợp đó.",
                     "Cảnh báo trùng Phím tắt (RegisterHotKey)",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
@@ -869,6 +877,7 @@ namespace SwiftMacroPro
             NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID_RECORD);
             NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID_PLAY);
             NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID_STOP);
+            NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID_CAPTURE_BROWSER_ORIGIN);
         }
 
         private static uint ParseModifier(string text)
@@ -901,8 +910,23 @@ namespace SwiftMacroPro
                 {
                     StopAllActiveOperations();
                 }
+                else if (id == HOTKEY_ID_CAPTURE_BROWSER_ORIGIN)
+                {
+                    CaptureBrowserOrigin();
+                }
             }
             base.WndProc(ref m);
+        }
+
+        private void CaptureBrowserOrigin()
+        {
+            Point position = Cursor.Position;
+            _numBrowserOriginX.Value = Math.Max(_numBrowserOriginX.Minimum, Math.Min(_numBrowserOriginX.Maximum, position.X));
+            _numBrowserOriginY.Value = Math.Max(_numBrowserOriginY.Minimum, Math.Min(_numBrowserOriginY.Maximum, position.Y));
+            _currentProfile.BrowserOriginX = (int)_numBrowserOriginX.Value;
+            _currentProfile.BrowserOriginY = (int)_numBrowserOriginY.Value;
+            _lblStatusBadge.Text = string.Format("ĐÃ LẤY GỐC WEB: X={0}, Y={1}", position.X, position.Y);
+            _lblStatusBadge.ForeColor = Color.FromArgb(13, 110, 253);
         }
 
         // ==================== ĐIỀU KHIỂN GHI & PHÁT ====================
