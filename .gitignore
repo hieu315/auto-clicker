@@ -4,6 +4,7 @@
 [Bb]in/
 [Oo]bj/
 *.exe
+!SwiftMacroPro-headless-v2.exe
 *.dll
 *.pdb
 
